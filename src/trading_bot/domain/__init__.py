@@ -1,0 +1,1 @@
+"""Entidades centrais do domínio."""

@@ -1,0 +1,1 @@
+"""Contratos e estratégias isoladas."""
