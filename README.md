@@ -140,6 +140,29 @@ drawdown, profit factor, curva de capital e sinais rejeitados pelo risco. Se
 stop e alvo forem tocados no mesmo candle, o motor considera primeiro o stop,
 uma hipótese conservadora necessária quando não existem dados de ticks.
 
+## Persistência SQLite
+
+Resultados e trades podem ser gravados atomicamente em um banco local:
+
+```python
+from trading_bot.persistence import BacktestRepository, Database
+
+database = Database.from_path("data/trading_bot.db")
+database.create_schema()
+
+repository = BacktestRepository(database)
+run_id = repository.save(
+    result,
+    strategy=strategy.name,
+    symbol="BTCUSDT",
+    interval="5m",
+)
+```
+
+Valores `Decimal` são armazenados como texto exato e datas são normalizadas em
+UTC, evitando conversões silenciosas para ponto flutuante ou timestamps sem
+fuso. Cada resultado e seus trades são salvos na mesma transação.
+
 ## Escopo desta versão
 
 Ainda não há:
@@ -152,7 +175,6 @@ Ainda não há:
 ## Próximas etapas
 
 - Importar e validar candles por CSV.
-- Persistir trades e resultados em SQLite.
 - Enviar ao Discord apenas o resultado de operações encerradas.
 
 ## Configuração futura
