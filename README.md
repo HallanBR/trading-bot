@@ -46,19 +46,33 @@ trading-bot/
 └── pyproject.toml
 ```
 
+## API pública da Binance
+
+O projeto já possui um provedor inicial para candles do mercado Spot:
+
+```python
+from trading_bot.market_data import BinanceMarketDataProvider
+
+with BinanceMarketDataProvider() as binance:
+    candles = binance.get_candles("BTCUSDT", "5m", limit=100)
+```
+
+Ele usa somente o endpoint público de dados de mercado da Binance. Não requer
+chave, não acessa saldo e não envia ordens.
+
 ## Escopo desta versão
 
 Esta versão contém somente a fundação do repositório. Ainda não há:
 
 - lógica de compra ou venda;
-- integração com corretoras;
+- integração autenticada com corretoras;
 - execução de ordens;
 - estratégia pronta;
 - uso de dinheiro real.
 
 ## Próximas etapas
 
-- Definir modelos de `Candle`, `Signal`, `Position` e `Trade`.
+- Definir os modelos de `Signal`, `Position` e `Trade`.
 - Importar e validar candles por CSV.
 - Implementar EMA, RSI e ATR com testes.
 - Criar o primeiro motor de backtest sem viés de dados futuros.
