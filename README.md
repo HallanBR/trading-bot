@@ -98,33 +98,53 @@ print(signal.action, signal.reason)
 A estratégia somente gera um objeto `Signal` explicável. Ela não possui acesso
 a saldo, conta de corretora ou rotas de execução de ordens.
 
+## Gestão de risco
+
+Antes de aceitar um sinal, `RiskManager` verifica limites globais e calcula a
+quantidade simulada:
+
+```python
+from decimal import Decimal
+
+from trading_bot.risk import RiskContext, RiskManager
+
+context = RiskContext(
+    account_equity=Decimal("10000"),
+    day_start_equity=Decimal("10000"),
+)
+assessment = RiskManager().evaluate(signal, context)
+```
+
+Os limites padrão incluem 1% de risco por operação, 3% de perda diária, cinco
+operações por dia, três perdas consecutivas e uma posição simultânea. Todos são
+configuráveis e devem ser validados por backtest antes de qualquer uso.
+
 ## Escopo desta versão
 
-Esta versão contém somente a fundação do repositório. Ainda não há:
+Ainda não há:
 
-- lógica de compra ou venda;
 - integração autenticada com corretoras;
 - execução de ordens;
-- estratégia pronta;
+- garantia de rentabilidade;
 - uso de dinheiro real.
 
 ## Próximas etapas
 
 - Importar e validar candles por CSV.
 - Criar o primeiro motor de backtest sem viés de dados futuros.
-- Simular custos, slippage e gestão de risco.
+- Simular entradas, saídas, taxas e slippage.
 - Enviar ao Discord apenas o resultado de operações encerradas.
 
 ## Configuração futura
 
-Quando o módulo de notificações for implementado:
+Para manter configurações sensíveis apenas no computador:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Preencha `DISCORD_WEBHOOK_URL` no arquivo `.env`. Nunca publique esse endereço
-no repositório.
+Preencha `DISCORD_WEBHOOK_URL` no arquivo `.env`. O arquivo `.env` é ignorado
+pelo Git; `.env.example` deve permanecer sempre sem credenciais.
 
 ## Licença
 
