@@ -60,6 +60,24 @@ with BinanceMarketDataProvider() as binance:
 Ele usa somente o endpoint público de dados de mercado da Binance. Não requer
 chave, não acessa saldo e não envia ordens.
 
+## Indicadores técnicos
+
+O núcleo inicial inclui EMA, RSI e ATR:
+
+```python
+from trading_bot.indicators import atr, ema, rsi
+
+closes = [candle.close for candle in candles]
+
+ema_9 = ema(closes, period=9)
+rsi_14 = rsi(closes, period=14)
+atr_14 = atr(candles, period=14)
+```
+
+Os resultados têm o mesmo tamanho da entrada. As posições que ainda não possuem
+histórico suficiente recebem `None`, impedindo que estratégias usem dados antes
+do período de aquecimento.
+
 ## Escopo desta versão
 
 Esta versão contém somente a fundação do repositório. Ainda não há:
@@ -74,7 +92,7 @@ Esta versão contém somente a fundação do repositório. Ainda não há:
 
 - Definir os modelos de `Signal`, `Position` e `Trade`.
 - Importar e validar candles por CSV.
-- Implementar EMA, RSI e ATR com testes.
+- Criar a primeira estratégia combinando EMA, RSI e ATR.
 - Criar o primeiro motor de backtest sem viés de dados futuros.
 - Simular custos, slippage e gestão de risco.
 - Enviar ao Discord apenas o resultado de operações encerradas.
