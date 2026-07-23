@@ -4,11 +4,6 @@ Plataforma modular, em fase inicial, para estudar estratégias quantitativas com
 dados históricos, backtesting, paper trading e notificações de resultados no
 Discord.
 
-> [!WARNING]
-> Este projeto é educacional e experimental. Ele não garante rentabilidade, não
-> constitui recomendação financeira e ainda não executa operações com dinheiro
-> real.
-
 ## Objetivo inicial
 
 O primeiro marco funcional será:
