@@ -65,17 +65,6 @@ Esta versão contém somente a fundação do repositório. Ainda não há:
 - Simular custos, slippage e gestão de risco.
 - Enviar ao Discord apenas o resultado de operações encerradas.
 
-## Configuração futura
-
-Quando o módulo de notificações for implementado:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Preencha `DISCORD_WEBHOOK_URL` no arquivo `.env`. Nunca publique esse endereço
-no repositório.
-
 ## Licença
 
 Distribuído sob a licença MIT. Consulte [LICENSE](LICENSE).
