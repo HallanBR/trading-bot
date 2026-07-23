@@ -78,6 +78,26 @@ Os resultados têm o mesmo tamanho da entrada. As posições que ainda não poss
 histórico suficiente recebem `None`, impedindo que estratégias usem dados antes
 do período de aquecimento.
 
+## Estratégia inicial
+
+`EmaRsiAtrStrategy` combina:
+
+- cruzamento entre EMA rápida e EMA lenta;
+- filtro de RSI configurável;
+- stop-loss e take-profit calculados pela volatilidade do ATR.
+
+```python
+from trading_bot.strategies import EmaRsiAtrStrategy
+
+strategy = EmaRsiAtrStrategy()
+signal = strategy.generate_signal(candles)
+
+print(signal.action, signal.reason)
+```
+
+A estratégia somente gera um objeto `Signal` explicável. Ela não possui acesso
+a saldo, conta de corretora ou rotas de execução de ordens.
+
 ## Escopo desta versão
 
 Esta versão contém somente a fundação do repositório. Ainda não há:
@@ -90,9 +110,7 @@ Esta versão contém somente a fundação do repositório. Ainda não há:
 
 ## Próximas etapas
 
-- Definir os modelos de `Signal`, `Position` e `Trade`.
 - Importar e validar candles por CSV.
-- Criar a primeira estratégia combinando EMA, RSI e ATR.
 - Criar o primeiro motor de backtest sem viés de dados futuros.
 - Simular custos, slippage e gestão de risco.
 - Enviar ao Discord apenas o resultado de operações encerradas.
