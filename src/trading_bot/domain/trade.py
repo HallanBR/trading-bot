@@ -23,6 +23,8 @@ class Trade:
     quantity: Decimal
     entry_price: Decimal
     exit_price: Decimal
+    stop_loss: Decimal
+    take_profit: Decimal
     fees: Decimal
     opened_at: datetime
     closed_at: datetime
@@ -32,7 +34,13 @@ class Trade:
     def __post_init__(self) -> None:
         require_aware_datetime(self.opened_at, "opened_at")
         require_aware_datetime(self.closed_at, "closed_at")
-        for field_name in ("quantity", "entry_price", "exit_price"):
+        for field_name in (
+            "quantity",
+            "entry_price",
+            "exit_price",
+            "stop_loss",
+            "take_profit",
+        ):
             require_positive(getattr(self, field_name), field_name)
         require_non_negative(self.fees, "fees")
         if self.closed_at < self.opened_at:
@@ -44,6 +52,12 @@ class Trade:
             or not self.strategy
         ):
             raise ValueError("Identificadores e estratégia são obrigatórios.")
+        if self.side is PositionSide.LONG:
+            valid = self.stop_loss < self.entry_price < self.take_profit
+        else:
+            valid = self.take_profit < self.entry_price < self.stop_loss
+        if not valid:
+            raise ValueError("Stop, entrada e alvo estão em ordem inválida.")
 
     @property
     def gross_pnl(self) -> Decimal:

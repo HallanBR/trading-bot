@@ -119,6 +119,27 @@ Os limites padrão incluem 1% de risco por operação, 3% de perda diária, cinc
 operações por dia, três perdas consecutivas e uma posição simultânea. Todos são
 configuráveis e devem ser validados por backtest antes de qualquer uso.
 
+## Backtest
+
+O motor executa sinais somente na abertura do candle seguinte e inclui custos
+configuráveis:
+
+```python
+from trading_bot.backtest import BacktestEngine
+
+engine = BacktestEngine(strategy)
+result = engine.run(candles)
+
+print(result.net_profit)
+print(result.win_rate_percent)
+print(result.max_drawdown_percent)
+```
+
+O resultado inclui trades, lucro líquido, retorno percentual, taxa de acerto,
+drawdown, profit factor, curva de capital e sinais rejeitados pelo risco. Se
+stop e alvo forem tocados no mesmo candle, o motor considera primeiro o stop,
+uma hipótese conservadora necessária quando não existem dados de ticks.
+
 ## Escopo desta versão
 
 Ainda não há:
@@ -131,8 +152,7 @@ Ainda não há:
 ## Próximas etapas
 
 - Importar e validar candles por CSV.
-- Criar o primeiro motor de backtest sem viés de dados futuros.
-- Simular entradas, saídas, taxas e slippage.
+- Persistir trades e resultados em SQLite.
 - Enviar ao Discord apenas o resultado de operações encerradas.
 
 ## Configuração futura

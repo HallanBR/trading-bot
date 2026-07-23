@@ -24,6 +24,8 @@ def trade(**overrides: object) -> Trade:
         "quantity": Decimal(2),
         "entry_price": Decimal(100),
         "exit_price": Decimal(110),
+        "stop_loss": Decimal(95),
+        "take_profit": Decimal(110),
         "fees": Decimal(1),
         "opened_at": OPENED_AT,
         "closed_at": OPENED_AT + timedelta(minutes=5),
@@ -46,6 +48,8 @@ def test_short_trade_profits_when_exit_is_lower() -> None:
     result = trade(
         side=PositionSide.SHORT,
         exit_price=Decimal(90),
+        stop_loss=Decimal(105),
+        take_profit=Decimal(90),
         fees=Decimal(2),
     )
 
