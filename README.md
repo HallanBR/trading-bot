@@ -163,6 +163,30 @@ Valores `Decimal` são armazenados como texto exato e datas são normalizadas em
 UTC, evitando conversões silenciosas para ponto flutuante ou timestamps sem
 fuso. Cada resultado e seus trades são salvos na mesma transação.
 
+## Notificações no Discord
+
+O webhook é carregado exclusivamente do `.env` e mantido como segredo:
+
+```python
+from trading_bot.notifications import (
+    DiscordSettings,
+    DiscordWebhookNotifier,
+    NotificationService,
+)
+
+settings = DiscordSettings()
+discord = DiscordWebhookNotifier.from_settings(settings)
+notifications = NotificationService([discord])
+
+results = notifications.notify_trade(trade)
+discord.close()
+```
+
+O serviço aceita somente objetos `Trade`, portanto sinais e posições abertas
+não geram mensagens. Falhas do Discord são retornadas como resultados seguros,
+sem interromper outros canais e sem incluir a URL do webhook nos erros.
+Backtests não enviam notificações automaticamente.
+
 ## Escopo desta versão
 
 Ainda não há:
@@ -175,7 +199,7 @@ Ainda não há:
 ## Próximas etapas
 
 - Importar e validar candles por CSV.
-- Enviar ao Discord apenas o resultado de operações encerradas.
+- Criar o ciclo de paper trading com atualização periódica de candles.
 
 ## Configuração futura
 
