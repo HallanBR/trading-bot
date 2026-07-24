@@ -4,11 +4,6 @@ Plataforma modular, em fase inicial, para estudar estratégias quantitativas com
 dados históricos, backtesting, paper trading e notificações de resultados no
 Discord.
 
-> [!WARNING]
-> Este projeto é educacional e experimental. Ele não garante rentabilidade, não
-> constitui recomendação financeira e ainda não executa operações com dinheiro
-> real.
-
 ## Objetivo inicial
 
 O primeiro marco funcional será:
@@ -249,17 +244,6 @@ Ainda não há:
 - Importar e validar candles por CSV.
 - Persistir o estado da sessão paper para recuperação após reinicialização.
 - Criar o conjunto de comparação de vitórias e a validação temporal do modelo.
-
-## Configuração futura
-
-Para manter configurações sensíveis apenas no computador:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Preencha `DISCORD_WEBHOOK_URL` no arquivo `.env`. O arquivo `.env` é ignorado
-pelo Git; `.env.example` deve permanecer sempre sem credenciais.
 
 ## Licença
 
