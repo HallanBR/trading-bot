@@ -11,6 +11,7 @@ class BacktestConfig:
     initial_equity: Decimal = Decimal(10000)
     fee_rate: Decimal = Decimal("0.001")
     slippage_rate: Decimal = Decimal("0.0005")
+    strategy_history_limit: int = 1_000
 
     def __post_init__(self) -> None:
         if self.initial_equity <= 0:
@@ -21,3 +22,9 @@ class BacktestConfig:
         }.items():
             if not Decimal(0) <= value < Decimal(1):
                 raise ValueError(f"{name} deve estar entre zero e um.")
+        if (
+            isinstance(self.strategy_history_limit, bool)
+            or not isinstance(self.strategy_history_limit, int)
+            or self.strategy_history_limit < 2
+        ):
+            raise ValueError("strategy_history_limit deve ser inteiro maior que um.")

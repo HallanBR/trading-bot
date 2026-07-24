@@ -57,9 +57,23 @@ with BinanceMarketDataProvider() as binance:
 Ele usa somente o endpoint público de dados de mercado da Binance. Não requer
 chave, não acessa saldo e não envia ordens.
 
+### Histórico extenso
+
+O coletor pagina automaticamente o limite de mil candles por resposta, remove
+repetições e grava valores financeiros sem conversão para `float`:
+
+```powershell
+python scripts/download_history.py --symbol BTCUSDT --interval 1m --start 2026-01-01 --end 2026-07-01
+```
+
+O CSV validado é salvo em `data/history/` e não entra no Git. Também é possível
+informar `--output`, `--page-limit` e `--max-candles`. As datas sem horário são
+interpretadas como UTC e o instante final é exclusivo.
+
 ## Indicadores técnicos
 
-O núcleo inicial inclui EMA, RSI e ATR:
+O núcleo inclui EMA, SMA, RSI, ATR, VWAP móvel, volume relativo e Bandas de
+Bollinger:
 
 ```python
 from trading_bot.indicators import atr, ema, rsi
@@ -75,7 +89,7 @@ Os resultados têm o mesmo tamanho da entrada. As posições que ainda não poss
 histórico suficiente recebem `None`, impedindo que estratégias usem dados antes
 do período de aquecimento.
 
-## Estratégia inicial
+## Estratégias
 
 `EmaRsiAtrStrategy` combina:
 
@@ -94,6 +108,20 @@ print(signal.action, signal.reason)
 
 A estratégia somente gera um objeto `Signal` explicável. Ela não possui acesso
 a saldo, conta de corretora ou rotas de execução de ordens.
+
+Os candidatos adicionais ficam isolados para que não sejam misturados antes da
+validação:
+
+- `filtered`: EMA + RSI + ATR com tendência, VWAP, volume, volatilidade e
+  cobertura mínima de taxas e slippage;
+- `breakout`: rompimento de faixa confirmado por tendência e volume relativo;
+- `mean-reversion`: reversão à média com Bollinger e RSI somente em regime
+  compatível;
+- `base`: estratégia inicial, mantida como referência.
+
+Mais filtros não garantem uma taxa de acerto maior. Eles reduzem operações
+fracas, mas cada candidato precisa superar a referência em dados que não foram
+usados para sua configuração.
 
 ## Gestão de risco
 
@@ -137,6 +165,23 @@ drawdown, profit factor, curva de capital e sinais rejeitados pelo risco. Se
 stop e alvo forem tocados no mesmo candle, o motor considera primeiro o stop,
 uma hipótese conservadora necessária quando não existem dados de ticks.
 
+### Walk-forward e comparação
+
+O walk-forward mantém o treino sempre antes do teste. O período de aquecimento
+fornece indicadores ao primeiro candle de teste, mas nenhuma operação pode ser
+aberta durante o treino.
+
+Depois de baixar um CSV, compare os candidatos:
+
+```powershell
+python scripts/compare_strategies.py --csv data/history/BTCUSDT_1m_20260101_20260701.csv --train-size 20000 --test-size 5000
+```
+
+A tabela considera somente resultados fora da amostra e inclui custos
+simulados. O ranking é uma ferramenta para descartar candidatos fracos; ele não
+é garantia de resultado futuro. Para uma verificação rápida do pipeline, use
+`--max-candles`; campanhas finais devem usar o CSV inteiro.
+
 ## Persistência SQLite
 
 Resultados e trades podem ser gravados atomicamente em um banco local:
@@ -176,10 +221,15 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 
 # Outro canal, dedicado à atividade operacional
 DISCORD_MONITORING_WEBHOOK_URL=https://discord.com/api/webhooks/...
+
+# Canal opcional, reservado para pesquisas e relatórios futuros
+DISCORD_RESEARCH_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
 
-Os endereços devem pertencer a webhooks diferentes. Se o segundo não estiver
-configurado, o monitoramento continua normalmente no terminal.
+Os endereços configurados devem pertencer a webhooks diferentes. O terceiro
+canal já é reconhecido e validado, mas ainda não recebe mensagens
+automaticamente. Se o segundo não estiver configurado, o monitoramento continua
+normalmente no terminal.
 
 ```python
 from trading_bot.notifications import (
@@ -220,6 +270,18 @@ checkpoint.
 ```powershell
 python scripts/run_paper_trading.py --symbol BTCUSDT --interval 5m
 ```
+
+Após comparar um candidato no walk-forward, ele pode ser selecionado
+explicitamente:
+
+```powershell
+python scripts/run_paper_trading.py --symbol BTCUSDT --interval 1m --strategy filtered
+```
+
+As opções são `base`, `filtered`, `breakout` e `mean-reversion`. A opção padrão
+continua sendo `base`; o sistema não troca de estratégia sozinho com base em
+uma única vitória ou derrota. Cada estratégia possui sua própria sessão
+persistida.
 
 Interrompa com `Ctrl+C`. O ciclo:
 
@@ -279,13 +341,14 @@ Ainda não há:
 
 ## Próximas etapas
 
-- Importar e validar candles por CSV.
-- Coletar histórico extenso da Binance.
-- Implementar validação walk-forward.
-- Testar filtros de mercado e um otimizador controlado.
+- Executar campanhas comparativas em outros ativos e intervalos.
+- Implementar um otimizador controlado dentro de cada janela de treino.
 - Treinar o primeiro filtro probabilístico somente após acumular dados.
+- Integrar exclusivamente com Binance Spot Testnet.
+- Criar o dashboard de sessões, operações e pesquisas.
 
-Consulte [ROADMAP.md](ROADMAP.md) para acompanhar as dez prioridades.
+Consulte [ROADMAP.md](ROADMAP.md) para acompanhar as dez prioridades e
+[RESEARCH.md](RESEARCH.md) para ver campanhas e decisões baseadas em evidências.
 
 ## Licença
 

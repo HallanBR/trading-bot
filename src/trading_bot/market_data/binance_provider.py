@@ -1,7 +1,7 @@
 """Cliente para dados públicos do mercado Spot da Binance."""
 
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -98,6 +98,70 @@ class BinanceMarketDataProvider:
         return [
             self._parse_candle(normalized_symbol, interval, item) for item in payload
         ]
+
+    def get_historical_candles(
+        self,
+        symbol: str,
+        interval: str,
+        *,
+        start_time: datetime,
+        end_time: datetime,
+        page_limit: int = 1_000,
+        max_candles: int | None = None,
+    ) -> list[Candle]:
+        """Baixa um intervalo extenso paginando sem repetir candles.
+
+        ``end_time`` é exclusivo no resultado. A API pública limita cada
+        resposta, portanto o cursor avança um milissegundo após a abertura do
+        último candle recebido.
+        """
+
+        self._validate_request(interval, page_limit, start_time, end_time)
+        if max_candles is not None and max_candles <= 0:
+            raise ValueError("max_candles deve ser positivo quando informado.")
+
+        normalized_symbol = self._validate_symbol(symbol)
+        cursor = start_time
+        candles: list[Candle] = []
+        last_open_time: datetime | None = None
+
+        while cursor < end_time:
+            request_limit = page_limit
+            if max_candles is not None:
+                remaining = max_candles - len(candles)
+                if remaining <= 0:
+                    break
+                request_limit = min(request_limit, remaining)
+
+            page = self.get_candles(
+                normalized_symbol,
+                interval,
+                limit=request_limit,
+                start_time=cursor,
+                end_time=end_time,
+            )
+            accepted = [
+                candle
+                for candle in page
+                if start_time <= candle.open_time < end_time
+                and (last_open_time is None or candle.open_time > last_open_time)
+            ]
+            if not accepted:
+                break
+
+            candles.extend(accepted)
+            last_open_time = accepted[-1].open_time
+            next_cursor = last_open_time + timedelta(milliseconds=1)
+            if next_cursor <= cursor:
+                raise BinanceResponseError(
+                    "A paginação da Binance não avançou no tempo."
+                )
+            cursor = next_cursor
+
+            if len(page) < request_limit:
+                break
+
+        return candles
 
     def close(self) -> None:
         """Fecha somente o cliente HTTP criado pelo próprio provedor."""

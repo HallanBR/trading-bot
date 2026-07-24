@@ -38,10 +38,21 @@ class BacktestEngine:
             slippage_rate=self.config.slippage_rate,
         )
 
-    def run(self, candles: Sequence[Candle]) -> BacktestResult:
-        """Simula sinais, entradas no candle seguinte e encerramentos."""
+    def run(
+        self,
+        candles: Sequence[Candle],
+        *,
+        trade_start_index: int = 0,
+    ) -> BacktestResult:
+        """Simula entradas sem negociar o período opcional de aquecimento."""
 
         self._validate_candles(candles)
+        if (
+            isinstance(trade_start_index, bool)
+            or not isinstance(trade_start_index, int)
+            or not 0 <= trade_start_index <= len(candles)
+        ):
+            raise ValueError("trade_start_index deve estar dentro da série de candles.")
         if not candles:
             return BacktestResult(
                 initial_equity=self.config.initial_equity,
@@ -70,8 +81,10 @@ class BacktestEngine:
                 day_start_equity = balance
                 daily_net_pnl = Decimal(0)
                 trades_today = 0
+                consecutive_losses = 0
 
-            if pending_signal is not None and position is None:
+            is_tradable = index >= trade_start_index
+            if is_tradable and pending_signal is not None and position is None:
                 try:
                     executable_signal = self._fills.signal_at_open(
                         pending_signal,
@@ -128,8 +141,15 @@ class BacktestEngine:
                         consecutive_losses = 0
                     position = None
 
-            if position is None and pending_signal is None:
-                signal = self.strategy.generate_signal(candles[: index + 1])
+            can_prepare_next_entry = index + 1 >= trade_start_index
+            if position is None and pending_signal is None and can_prepare_next_entry:
+                history_start = max(
+                    0,
+                    index + 1 - self.config.strategy_history_limit,
+                )
+                signal = self.strategy.generate_signal(
+                    candles[history_start : index + 1]
+                )
                 if signal.action is not SignalAction.HOLD:
                     pending_signal = signal
 

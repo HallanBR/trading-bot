@@ -13,14 +13,16 @@ trading.
 
 ## Parte 2 — Dados e validação temporal
 
-- [ ] Coletar histórico extenso e paginado da Binance.
-- [ ] Criar armazenamento e importação de candles por CSV.
-- [ ] Implementar backtests walk-forward sem acesso a dados futuros.
+- [x] Coletar histórico extenso e paginado da Binance.
+- [x] Criar armazenamento e importação de candles por CSV.
+- [x] Implementar backtests walk-forward sem acesso a dados futuros.
 
 ## Parte 3 — Pesquisa de estratégia
 
-- [ ] Testar filtros de tendência, volume, volatilidade e horário.
-- [ ] Comparar cada filtro isoladamente contra a estratégia-base.
+- [x] Implementar filtros de tendência, VWAP, volume, volatilidade e custos.
+- [x] Adicionar candidatos de rompimento e reversão à média.
+- [x] Comparar candidatos fora da amostra contra a estratégia-base.
+- [ ] Executar campanhas em diferentes ativos, intervalos e regimes.
 - [ ] Criar otimizador com conjuntos separados de treino e validação.
 
 ## Parte 4 — Aprendizado de máquina

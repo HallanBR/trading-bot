@@ -1,5 +1,6 @@
 """Testes da conta e execução virtual stateful."""
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -120,3 +121,19 @@ def test_restored_open_position_keeps_trade_counter_and_can_close() -> None:
 
     assert trades[0].trade_id == "paper-trade-1"
     assert restored.snapshot().open_position is None
+
+
+def test_consecutive_loss_block_resets_on_new_utc_day() -> None:
+    paper = executor()
+    initial = paper.export_state()
+    paper.restore_state(
+        replace(
+            initial,
+            current_day=datetime(2026, 1, 1, tzinfo=timezone.utc).date(),
+            consecutive_losses=3,
+        )
+    )
+
+    paper.process_candle(market_candle(high="10.5", low="9.5", index=24 * 60))
+
+    assert paper.snapshot().consecutive_losses == 0

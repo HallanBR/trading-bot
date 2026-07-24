@@ -191,7 +191,7 @@ class PaperTradingEngine:
                         self._event(
                             MonitoringEventType.WAITING_SIGNAL,
                             candle,
-                            "Aguardando sinal.",
+                            f"Aguardando sinal: {signal.reason}",
                         )
                     )
             elif self.executor.has_open_position and not trades:

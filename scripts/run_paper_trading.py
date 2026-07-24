@@ -31,7 +31,7 @@ from trading_bot.persistence import (
     build_paper_session_id,
 )
 from trading_bot.risk import RiskManager
-from trading_bot.strategies import EmaRsiAtrStrategy
+from trading_bot.strategies import STRATEGY_BUILDERS, create_strategy
 from trading_bot.trading import (
     PaperTradingConfig,
     PaperTradingEngine,
@@ -46,13 +46,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookback", type=int, default=300)
     parser.add_argument("--poll-seconds", type=float, default=30.0)
     parser.add_argument("--initial-equity", type=Decimal, default=Decimal(10_000))
+    parser.add_argument(
+        "--strategy",
+        choices=tuple(STRATEGY_BUILDERS),
+        default="base",
+        help="Estratégia paper. Compare no walk-forward antes de trocar a base.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     symbol = args.symbol.upper()
-    strategy = EmaRsiAtrStrategy()
+    strategy = create_strategy(args.strategy)
     learning_path = PROJECT_ROOT / "data" / "losing_trades.db"
     operational_path = PROJECT_ROOT / "data" / "trading_bot.db"
     settings = DiscordSettings.from_env_file(PROJECT_ROOT / ".env")
@@ -110,6 +116,7 @@ def main() -> int:
     stop_event = Event()
     print("Paper trading iniciado. Pressione Ctrl+C para encerrar.")
     print(f"Sessão: {session_id}")
+    print(f"Estratégia: {strategy.name}")
     print(f"Estado e operações serão armazenados em: {operational_path}")
     print(f"Perdas serão armazenadas em: {learning_path}")
     if monitoring_discord is None:

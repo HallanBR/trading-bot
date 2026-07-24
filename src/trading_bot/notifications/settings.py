@@ -19,6 +19,7 @@ class DiscordSettings(BaseSettings):
 
     discord_webhook_url: SecretStr
     discord_monitoring_webhook_url: SecretStr | None = None
+    discord_research_webhook_url: SecretStr | None = None
 
     @field_validator("discord_webhook_url")
     @classmethod
@@ -28,9 +29,13 @@ class DiscordSettings(BaseSettings):
         cls._require_discord_webhook(value, "DISCORD_WEBHOOK_URL")
         return value
 
-    @field_validator("discord_monitoring_webhook_url", mode="before")
+    @field_validator(
+        "discord_monitoring_webhook_url",
+        "discord_research_webhook_url",
+        mode="before",
+    )
     @classmethod
-    def empty_monitoring_webhook_is_disabled(cls, value: object) -> object:
+    def empty_optional_webhook_is_disabled(cls, value: object) -> object:
         """Interpreta uma configuração opcional vazia como canal desativado."""
 
         return None if value == "" else value
@@ -47,6 +52,21 @@ class DiscordSettings(BaseSettings):
             cls._require_discord_webhook(
                 value,
                 "DISCORD_MONITORING_WEBHOOK_URL",
+            )
+        return value
+
+    @field_validator("discord_research_webhook_url")
+    @classmethod
+    def validate_research_webhook_url(
+        cls,
+        value: SecretStr | None,
+    ) -> SecretStr | None:
+        """Valida o canal reservado a relatórios e pesquisas de estratégia."""
+
+        if value is not None:
+            cls._require_discord_webhook(
+                value,
+                "DISCORD_RESEARCH_WEBHOOK_URL",
             )
         return value
 
@@ -67,13 +87,19 @@ class DiscordSettings(BaseSettings):
     def require_distinct_channels(self) -> Self:
         """Impede que resultados e atividade sejam enviados ao mesmo canal."""
 
-        monitoring = self.discord_monitoring_webhook_url
-        if monitoring is not None and (
-            monitoring.get_secret_value() == self.discord_webhook_url.get_secret_value()
-        ):
-            raise ValueError(
-                "Os webhooks de resultados e monitoramento devem ser diferentes."
-            )
+        configured = [
+            self.discord_webhook_url.get_secret_value(),
+            *(
+                webhook.get_secret_value()
+                for webhook in (
+                    self.discord_monitoring_webhook_url,
+                    self.discord_research_webhook_url,
+                )
+                if webhook is not None
+            ),
+        ]
+        if len(configured) != len(set(configured)):
+            raise ValueError("Todos os webhooks configurados devem ser diferentes.")
         return self
 
     @classmethod

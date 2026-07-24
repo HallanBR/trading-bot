@@ -216,6 +216,7 @@ class PaperExecutor:
             self._day_start_equity = self._equity
             self._daily_net_pnl = Decimal(0)
             self._trades_today = 0
+            self._consecutive_losses = 0
 
     def _apply_trade(self, trade: Trade) -> None:
         self._equity += trade.net_pnl

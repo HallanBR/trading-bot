@@ -110,3 +110,79 @@ def test_get_candles_rejects_malformed_payload() -> None:
 
     with pytest.raises(BinanceResponseError):
         provider.get_candles("BTCUSDT", "5m")
+
+
+def test_get_historical_candles_paginates_without_duplicates() -> None:
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 1, 1, 0, 3, tzinfo=timezone.utc)
+    minute_ms = 60_000
+    first_ms = int(start.timestamp() * 1000)
+    calls: list[int] = []
+
+    def payload(index: int) -> list[object]:
+        open_ms = first_ms + (index * minute_ms)
+        return [
+            open_ms,
+            "100",
+            "101",
+            "99",
+            "100",
+            "10",
+            open_ms + minute_ms - 1,
+        ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(int(request.url.params["startTime"]))
+        page = [payload(0), payload(1)] if len(calls) == 1 else [payload(2)]
+        return httpx.Response(200, json=page)
+
+    provider = make_provider(httpx.MockTransport(handler))
+
+    candles = provider.get_historical_candles(
+        "BTCUSDT",
+        "1m",
+        start_time=start,
+        end_time=end,
+        page_limit=2,
+    )
+
+    assert len(candles) == 3
+    assert len({candle.open_time for candle in candles}) == 3
+    assert calls[1] == first_ms + minute_ms + 1
+
+
+def test_get_historical_candles_respects_maximum() -> None:
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        open_ms = int(request.url.params["startTime"])
+        limit = int(request.url.params["limit"])
+        return httpx.Response(
+            200,
+            json=[
+                [
+                    open_ms + (index * 60_000),
+                    "100",
+                    "101",
+                    "99",
+                    "100",
+                    "10",
+                    open_ms + ((index + 1) * 60_000) - 1,
+                ]
+                for index in range(limit)
+            ],
+        )
+
+    provider = make_provider(httpx.MockTransport(handler))
+
+    candles = provider.get_historical_candles(
+        "BTCUSDT",
+        "1m",
+        start_time=start,
+        end_time=end,
+        page_limit=2,
+        max_candles=3,
+    )
+
+    assert len(candles) == 3
