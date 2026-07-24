@@ -28,6 +28,11 @@ def test_risk_config_requires_fast_limits_to_be_positive_integers() -> None:
         RiskConfig(max_trades_per_day=0)
 
 
+def test_risk_config_rejects_non_positive_absolute_notional() -> None:
+    with pytest.raises(ValueError, match="max_position_notional"):
+        RiskConfig(max_position_notional=Decimal(0))
+
+
 def test_risk_context_rejects_negative_counts() -> None:
     with pytest.raises(ValueError, match="trades_today"):
         RiskContext(

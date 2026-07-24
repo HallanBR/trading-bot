@@ -23,7 +23,8 @@ trading.
 - [x] Adicionar candidatos de rompimento e reversão à média.
 - [x] Comparar candidatos fora da amostra contra a estratégia-base.
 - [ ] Executar campanhas em diferentes ativos, intervalos e regimes.
-- [ ] Criar otimizador com conjuntos separados de treino e validação.
+- [x] Criar otimizador com conjuntos separados de treino e validação.
+- [x] Permitir que o otimizador rejeite todos os candidatos e não opere.
 
 ## Parte 4 — Aprendizado de máquina
 

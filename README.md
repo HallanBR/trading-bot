@@ -144,6 +144,12 @@ Os limites padrão incluem 1% de risco por operação, 3% de perda diária, cinc
 operações por dia, três perdas consecutivas e uma posição simultânea. Todos são
 configuráveis e devem ser validados por backtest antes de qualquer uso.
 
+No runner paper, as futuras posições possuem ainda um teto absoluto padrão de
+`10 USDT`. Com capital virtual de `10.000 USDT`, isso limita a exposição a
+`0,1%` da conta e substitui o teto anterior que poderia chegar a `2.500 USDT`.
+O valor pode ser alterado explicitamente por `--max-position-usdt`, sem mudar o
+saldo virtual nem apagar o histórico.
+
 ## Backtest
 
 O motor executa sinais somente na abertura do candle seguinte e inclui custos
@@ -181,6 +187,23 @@ A tabela considera somente resultados fora da amostra e inclui custos
 simulados. O ranking é uma ferramenta para descartar candidatos fracos; ele não
 é garantia de resultado futuro. Para uma verificação rápida do pipeline, use
 `--max-candles`; campanhas finais devem usar o CSV inteiro.
+
+### Otimizador controlado
+
+A prioridade 7 usa uma grade deliberadamente pequena. Dentro de cada fold, os
+parâmetros são avaliados somente no trecho de validação pertencente ao treino.
+Depois, o candidato elegível é testado no período seguinte, que permaneceu
+intocado. Se todos tiverem lucro não positivo, amostra insuficiente, profit
+factor baixo ou drawdown excessivo, o sistema escolhe `NO_ELIGIBLE_CANDIDATE`
+e não abre operações.
+
+```powershell
+python scripts/run_controlled_optimizer.py
+```
+
+O comando é específico para os candles de `5m` desta fase e grava o relatório
+detalhado em `data/research/optimizer_5m.json`. Ele não altera o paper trading
+e não promove parâmetros automaticamente.
 
 ## Persistência SQLite
 
@@ -268,7 +291,7 @@ retroativas; depois processa cada candle fechado uma única vez e salva o
 checkpoint.
 
 ```powershell
-python scripts/run_paper_trading.py --symbol BTCUSDT --interval 5m
+python scripts/run_paper_trading.py --symbol BTCUSDT --interval 5m --max-position-usdt 10
 ```
 
 Após comparar um candidato no walk-forward, ele pode ser selecionado
@@ -282,6 +305,12 @@ As opções são `base`, `filtered`, `breakout` e `mean-reversion`. A opção pa
 continua sendo `base`; o sistema não troca de estratégia sozinho com base em
 uma única vitória ou derrota. Cada estratégia possui sua própria sessão
 persistida.
+
+Para consultar saldo, lucro ou perda acumulada e contagem de operações:
+
+```powershell
+python scripts/show_paper_status.py --symbol BTCUSDT --interval 5m
+```
 
 Interrompa com `Ctrl+C`. O ciclo:
 
@@ -342,7 +371,6 @@ Ainda não há:
 ## Próximas etapas
 
 - Executar campanhas comparativas em outros ativos e intervalos.
-- Implementar um otimizador controlado dentro de cada janela de treino.
 - Treinar o primeiro filtro probabilístico somente após acumular dados.
 - Integrar exclusivamente com Binance Spot Testnet.
 - Criar o dashboard de sessões, operações e pesquisas.

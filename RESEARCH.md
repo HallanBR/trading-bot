@@ -55,3 +55,30 @@ folds. Nenhuma estratégia está aprovada para promoção.
 - Na prioridade 7, otimizar parâmetros somente dentro do treino de cada fold.
 - Exigir lucro líquido positivo, amostra suficiente, drawdown aceitável e
   estabilidade entre folds antes de promover um candidato para paper.
+
+## Campanha 2026-07-24 — Otimizador controlado em 5 minutos
+
+Foram avaliados doze conjuntos de EMA e saídas por ATR. Cada um dos seis folds
+externos usou:
+
+- `20.000` candles de treino;
+- os últimos `3.000` candles do treino como validação interna;
+- `100` candles de aquecimento;
+- `5.000` candles posteriores e intocados como teste externo;
+- as mesmas taxas e slippage conservadores das campanhas anteriores.
+
+Todos os doze candidatos tiveram lucro líquido negativo na validação interna de
+todos os folds. Até o melhor resultado de cada fold permaneceu entre
+`-173,94 USDT` e `-244,92 USDT`.
+
+O otimizador selecionou `NO_ELIGIBLE_CANDIDATE` em seis de seis folds. Assim,
+nenhuma operação foi aberta no teste externo e o resultado foi `0,00 USDT`.
+Essa preservação não é evidência de rentabilidade: ela apenas confirma que o
+sistema deixou de escolher obrigatoriamente a alternativa menos ruim.
+
+Decisão:
+
+- não promover parâmetros;
+- concentrar as próximas pesquisas em filtros e features de regime para `5m`;
+- usar teto de `10 USDT` por posição nos experimentos paper futuros;
+- manter a execução real bloqueada.

@@ -30,7 +30,7 @@ from trading_bot.persistence import (
     PaperSessionRepository,
     build_paper_session_id,
 )
-from trading_bot.risk import RiskManager
+from trading_bot.risk import RiskConfig, RiskManager
 from trading_bot.strategies import STRATEGY_BUILDERS, create_strategy
 from trading_bot.trading import (
     PaperTradingConfig,
@@ -46,6 +46,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookback", type=int, default=300)
     parser.add_argument("--poll-seconds", type=float, default=30.0)
     parser.add_argument("--initial-equity", type=Decimal, default=Decimal(10_000))
+    parser.add_argument(
+        "--max-position-usdt",
+        type=Decimal,
+        default=Decimal(10),
+        help="Teto nocional de cada posição virtual; padrão conservador: 10 USDT.",
+    )
     parser.add_argument(
         "--strategy",
         choices=tuple(STRATEGY_BUILDERS),
@@ -84,7 +90,13 @@ def main() -> int:
     session_id = build_paper_session_id(symbol, args.interval, strategy.name)
     executor = PaperExecutor(
         initial_equity=args.initial_equity,
-        risk_manager=RiskManager(),
+        risk_manager=RiskManager(
+            RiskConfig(
+                risk_per_trade=Decimal("0.001"),
+                max_position_fraction=Decimal("0.01"),
+                max_position_notional=args.max_position_usdt,
+            )
+        ),
         fills=FillSimulator(
             fee_rate=Decimal("0.001"),
             slippage_rate=Decimal("0.0005"),
@@ -117,6 +129,7 @@ def main() -> int:
     print("Paper trading iniciado. Pressione Ctrl+C para encerrar.")
     print(f"Sessão: {session_id}")
     print(f"Estratégia: {strategy.name}")
+    print(f"Limite por posição virtual: {args.max_position_usdt:.2f} USDT")
     print(f"Estado e operações serão armazenados em: {operational_path}")
     print(f"Perdas serão armazenadas em: {learning_path}")
     if monitoring_discord is None:

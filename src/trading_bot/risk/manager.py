@@ -39,6 +39,7 @@ class RiskManager:
             account_equity=context.account_equity,
             risk_fraction=self.config.risk_per_trade,
             max_position_fraction=self.config.max_position_fraction,
+            max_position_notional=self.config.max_position_notional,
         )
         return RiskAssessment(
             approved=True,

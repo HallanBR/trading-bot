@@ -49,6 +49,20 @@ def test_position_size_respects_notional_cap() -> None:
     assert result.notional == Decimal(1_000)
 
 
+def test_position_size_respects_absolute_notional_cap() -> None:
+    result = calculate_position_size(
+        buy_signal(),
+        account_equity=Decimal(10_000),
+        risk_fraction=Decimal("0.01"),
+        max_position_fraction=Decimal("0.25"),
+        max_position_notional=Decimal(10),
+    )
+
+    assert result.quantity == Decimal("0.1")
+    assert result.risk_amount == Decimal("0.5")
+    assert result.notional == Decimal(10)
+
+
 def test_position_size_rejects_hold_signal() -> None:
     hold = Signal(
         symbol="BTCUSDT",
