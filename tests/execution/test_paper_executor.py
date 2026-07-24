@@ -38,6 +38,7 @@ def buy_signal(*, target: str = "12") -> Signal:
         take_profit=Decimal(target),
         strategy="TEST",
         reason="Entrada virtual de teste.",
+        indicators={"rsi": Decimal(55)},
     )
 
 
@@ -70,6 +71,8 @@ def test_paper_executor_opens_and_closes_virtual_trade() -> None:
     assert len(trades) == 1
     assert trades[0].result is TradeResult.WIN
     assert trades[0].trade_id == "paper-trade-1"
+    assert trades[0].entry_signal is not None
+    assert trades[0].entry_signal.indicators["rsi"] == Decimal(55)
     assert paper.snapshot().equity == Decimal(1_200)
     assert paper.snapshot().open_position is None
 

@@ -33,6 +33,7 @@ trading-bot/
 │   ├── domain/         # Entidades do domínio
 │   ├── execution/      # Execução simulada e, futuramente, adaptadores
 │   ├── indicators/     # Indicadores técnicos
+│   ├── learning/       # Banco isolado de exemplos para aprendizado futuro
 │   ├── market_data/    # Provedores e validação de dados
 │   ├── notifications/  # Notificações, incluindo Discord
 │   ├── persistence/    # Banco de dados e repositórios
@@ -208,6 +209,32 @@ Interrompa com `Ctrl+C`. O ciclo:
 O script não contém cliente autenticado da Binance, chave de corretora nem
 qualquer método de criação de ordens.
 
+## Banco de operações perdedoras
+
+Durante o paper trading, cada operação com resultado líquido negativo é gravada
+automaticamente em um banco SQLite separado:
+
+```text
+data/losing_trades.db
+```
+
+O registro preserva preços, quantidade, taxas, lucro/prejuízo bruto e líquido,
+horários, estratégia, motivo do sinal e os indicadores técnicos disponíveis no
+momento da entrada. Vitórias e empates não entram nesse banco, e um identificador
+estável impede que a mesma perda seja gravada duas vezes.
+
+Para consultar um resumo sem abrir o arquivo SQLite:
+
+```powershell
+python scripts/show_losing_trades.py
+```
+
+O arquivo fica somente no computador e é ignorado pelo Git. Esta etapa apenas
+constrói o conjunto de exemplos; ela ainda não treina modelos nem altera a
+estratégia automaticamente. Antes do aprendizado, também serão coletadas
+operações vencedoras em um conjunto de comparação, porque um modelo não pode
+aprender a diferença entre sucesso e fracasso observando somente perdas.
+
 ## Escopo desta versão
 
 Ainda não há:
@@ -221,6 +248,7 @@ Ainda não há:
 
 - Importar e validar candles por CSV.
 - Persistir o estado da sessão paper para recuperação após reinicialização.
+- Criar o conjunto de comparação de vitórias e a validação temporal do modelo.
 
 ## Configuração futura
 

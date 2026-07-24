@@ -4,9 +4,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
 
 from trading_bot.domain import Candle, Signal, SignalAction, Trade
 from trading_bot.execution import FillSimulator, PaperExecutor
+from trading_bot.learning import LearningDatabase, LosingTradeRepository
 from trading_bot.notifications import NotificationService
 from trading_bot.risk import RiskConfig, RiskManager
 from trading_bot.trading import PaperTradingEngine
@@ -135,3 +137,28 @@ def test_new_candles_generate_trade_and_one_notification() -> None:
     assert notifier.calls == 1
     assert duplicate_update.processed_candles == 0
     assert notifier.calls == 1
+
+
+def test_losing_trade_is_written_to_separate_learning_database(
+    tmp_path: Path,
+) -> None:
+    database = LearningDatabase.from_path(tmp_path / "losses.db")
+    database.create_schema()
+    losses = LosingTradeRepository(database)
+    engine = PaperTradingEngine(
+        SignalAtTenStrategy(),
+        paper_executor(),
+        losing_trades=losses,
+    )
+    warmup = candle(0, open_price="9", high="9.5", low="8.5", close="9")
+    signal_candle = candle(1, open_price="9", high="10", low="8.5", close="10")
+    loss_candle = candle(2, open_price="10", high="10.5", low="9", close="9.5")
+    engine.process_candles([warmup])
+
+    engine.process_candles([signal_candle])
+    update = engine.process_candles([loss_candle])
+
+    assert len(update.closed_trades) == 1
+    assert update.recorded_losses == 1
+    assert losses.count() == 1
+    database.dispose()

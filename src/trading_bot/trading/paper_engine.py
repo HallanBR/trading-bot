@@ -6,6 +6,7 @@ from datetime import datetime
 
 from trading_bot.domain import Candle, Trade
 from trading_bot.execution import PaperExecutor
+from trading_bot.learning import LosingTradeStore
 from trading_bot.notifications import NotificationResult, NotificationService
 from trading_bot.strategies import Strategy
 
@@ -17,6 +18,7 @@ class PaperTradingUpdate:
     primed_candles: int = 0
     processed_candles: int = 0
     closed_trades: tuple[Trade, ...] = ()
+    recorded_losses: int = 0
     notifications: tuple[NotificationResult, ...] = ()
 
 
@@ -29,6 +31,7 @@ class PaperTradingEngine:
         executor: PaperExecutor,
         *,
         notifications: NotificationService | None = None,
+        losing_trades: LosingTradeStore | None = None,
         max_history: int = 1_000,
     ) -> None:
         if max_history <= 1:
@@ -36,6 +39,7 @@ class PaperTradingEngine:
         self.strategy = strategy
         self.executor = executor
         self.notifications = notifications
+        self.losing_trades = losing_trades
         self.max_history = max_history
         self._history: list[Candle] = []
         self._last_processed_open_time: datetime | None = None
@@ -58,12 +62,17 @@ class PaperTradingEngine:
             or candle.open_time > self._last_processed_open_time
         ]
         closed_trades: list[Trade] = []
+        recorded_losses = 0
         notification_results: list[NotificationResult] = []
 
         for candle in new_candles:
             self._append_history(candle)
             trades = self.executor.process_candle(candle)
             closed_trades.extend(trades)
+            if self.losing_trades is not None:
+                for trade in trades:
+                    if self.losing_trades.save_loss(trade):
+                        recorded_losses += 1
             if self.notifications is not None:
                 for trade in trades:
                     notification_results.extend(self.notifications.notify_trade(trade))
@@ -79,6 +88,7 @@ class PaperTradingEngine:
         return PaperTradingUpdate(
             processed_candles=len(new_candles),
             closed_trades=tuple(closed_trades),
+            recorded_losses=recorded_losses,
             notifications=tuple(notification_results),
         )
 

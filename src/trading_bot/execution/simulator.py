@@ -92,6 +92,7 @@ class FillSimulator:
             take_profit=signal.take_profit,
             opened_at=candle.open_time,
             strategy=signal.strategy,
+            entry_signal=signal,
         )
 
     @staticmethod
@@ -151,6 +152,7 @@ class FillSimulator:
             closed_at=candle.close_time,
             strategy=position.strategy,
             exit_reason=reason,
+            entry_signal=position.entry_signal,
         )
 
     def with_slippage(self, price: Decimal, *, is_buy: bool) -> Decimal:

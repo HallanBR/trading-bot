@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from trading_bot.execution import FillSimulator, PaperExecutor
+from trading_bot.learning import LearningDatabase, LosingTradeRepository
 from trading_bot.market_data import BinanceMarketDataProvider
 from trading_bot.notifications import (
     DiscordSettings,
@@ -37,9 +38,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    learning_path = PROJECT_ROOT / "data" / "losing_trades.db"
     settings = DiscordSettings.from_env_file(PROJECT_ROOT / ".env")
     discord = DiscordWebhookNotifier.from_settings(settings)
     provider = BinanceMarketDataProvider()
+    learning_database = LearningDatabase.from_path(learning_path)
+    learning_database.create_schema()
+    losing_trades = LosingTradeRepository(learning_database)
     executor = PaperExecutor(
         initial_equity=args.initial_equity,
         risk_manager=RiskManager(),
@@ -52,6 +57,7 @@ def main() -> int:
         EmaRsiAtrStrategy(),
         executor,
         notifications=NotificationService([discord]),
+        losing_trades=losing_trades,
         max_history=args.lookback,
     )
     runner = PaperTradingRunner(
@@ -66,6 +72,7 @@ def main() -> int:
     )
     stop_event = Event()
     print("Paper trading iniciado. Pressione Ctrl+C para encerrar.")
+    print(f"Perdas serão armazenadas em: {learning_path}")
     try:
         runner.run_forever(stop_event)
     except KeyboardInterrupt:
@@ -74,6 +81,7 @@ def main() -> int:
     finally:
         provider.close()
         discord.close()
+        learning_database.dispose()
     return 0
 
 

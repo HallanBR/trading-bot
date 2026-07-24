@@ -9,6 +9,7 @@ from trading_bot.domain._validation import (
     require_positive,
 )
 from trading_bot.domain.enums import PositionSide
+from trading_bot.domain.signal import Signal
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,7 @@ class Position:
     take_profit: Decimal
     opened_at: datetime
     strategy: str
+    entry_signal: Signal | None = None
 
     def __post_init__(self) -> None:
         require_aware_datetime(self.opened_at, "opened_at")
@@ -44,3 +46,9 @@ class Position:
             valid = self.take_profit < self.entry_price < self.stop_loss
         if not valid:
             raise ValueError("Stop, entrada e alvo estão em ordem inválida.")
+        if self.entry_signal is not None and (
+            self.entry_signal.symbol != self.symbol
+            or self.entry_signal.interval != self.interval
+            or self.entry_signal.strategy != self.strategy
+        ):
+            raise ValueError("O sinal de entrada não pertence à posição.")
