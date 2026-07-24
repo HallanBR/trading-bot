@@ -9,9 +9,11 @@ from pathlib import Path
 from trading_bot.domain import Candle, Signal, SignalAction, Trade
 from trading_bot.execution import FillSimulator, PaperExecutor
 from trading_bot.learning import LearningDatabase, LosingTradeRepository
+from trading_bot.monitoring import MonitoringEventType
 from trading_bot.notifications import NotificationService
 from trading_bot.risk import RiskConfig, RiskManager
 from trading_bot.trading import PaperTradingEngine
+from trading_bot.trading.paper_state import PaperTradingState
 
 
 @dataclass
@@ -54,6 +56,23 @@ class SignalAtTenStrategy:
             strategy=self.name,
             reason="Sem entrada.",
         )
+
+
+@dataclass
+class RecordingCheckpointStore:
+    states: list[PaperTradingState]
+    saved_trades: list[Trade]
+
+    def save_checkpoint(
+        self,
+        session_id: str,
+        state: PaperTradingState,
+        trades: Sequence[Trade] = (),
+    ) -> int:
+        assert session_id == "paper-test"
+        self.states.append(state)
+        self.saved_trades.extend(trades)
+        return len(trades)
 
 
 def candle(
@@ -137,6 +156,13 @@ def test_new_candles_generate_trade_and_one_notification() -> None:
     assert notifier.calls == 1
     assert duplicate_update.processed_candles == 0
     assert notifier.calls == 1
+    assert [event.event_type for event in second_update.monitoring_events] == [
+        MonitoringEventType.CANDLE_PROCESSED,
+        MonitoringEventType.POSITION_OPENED,
+        MonitoringEventType.POSITION_CLOSED,
+        MonitoringEventType.WAITING_SIGNAL,
+        MonitoringEventType.RESULT_NOTIFIED,
+    ]
 
 
 def test_losing_trade_is_written_to_separate_learning_database(
@@ -161,4 +187,41 @@ def test_losing_trade_is_written_to_separate_learning_database(
     assert len(update.closed_trades) == 1
     assert update.recorded_losses == 1
     assert losses.count() == 1
+    assert MonitoringEventType.LOSS_RECORDED in {
+        event.event_type for event in update.monitoring_events
+    }
     database.dispose()
+
+
+def test_checkpoint_restores_pending_signal_without_reprocessing_candle() -> None:
+    store = RecordingCheckpointStore(states=[], saved_trades=[])
+    original_strategy = SignalAtTenStrategy()
+    original = PaperTradingEngine(
+        original_strategy,
+        paper_executor(),
+        checkpoint_store=store,
+        session_id="paper-test",
+    )
+    warmup = candle(0, open_price="9", high="9.5", low="8.5", close="9")
+    signal_candle = candle(1, open_price="9", high="10", low="8.5", close="10")
+    exit_candle = candle(2, open_price="10", high="12", low="9.5", close="11")
+    original.process_candles([warmup])
+    original.process_candles([signal_candle])
+    saved_state = store.states[-1]
+    restored_strategy = SignalAtTenStrategy()
+    restored = PaperTradingEngine(
+        restored_strategy,
+        paper_executor(),
+        checkpoint_store=store,
+        session_id="paper-test",
+    )
+
+    restored.restore_state(saved_state)
+    duplicate = restored.process_candles([signal_candle])
+    update = restored.process_candles([exit_candle])
+
+    assert duplicate.processed_candles == 0
+    assert restored_strategy.calls == 1
+    assert update.recorded_trades == 1
+    assert len(store.saved_trades) == 1
+    assert store.saved_trades[0].trade_id == "paper-trade-1"

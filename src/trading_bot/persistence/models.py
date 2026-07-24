@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from trading_bot.persistence.types import AwareDateTimeText, DecimalText
@@ -81,3 +81,48 @@ class TradeModel(Base):
     backtest_run: Mapped[BacktestRunModel] = relationship(
         back_populates="trades",
     )
+
+
+class PaperSessionModel(Base):
+    """Checkpoint mais recente de uma sessão paper identificável."""
+
+    __tablename__ = "paper_sessions"
+
+    session_id: Mapped[str] = mapped_column(String(180), primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(40), index=True)
+    interval: Mapped[str] = mapped_column(String(10))
+    strategy: Mapped[str] = mapped_column(String(100))
+    updated_at: Mapped[datetime] = mapped_column(AwareDateTimeText())
+    schema_version: Mapped[int] = mapped_column(Integer)
+    state_json: Mapped[str] = mapped_column(Text)
+
+
+class PaperTradeModel(Base):
+    """Histórico completo e deduplicado das operações paper encerradas."""
+
+    __tablename__ = "paper_trades"
+
+    case_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("paper_sessions.session_id", ondelete="CASCADE"),
+        index=True,
+    )
+    recorded_at: Mapped[datetime] = mapped_column(AwareDateTimeText())
+    trade_id: Mapped[str] = mapped_column(String(100), index=True)
+    symbol: Mapped[str] = mapped_column(String(40), index=True)
+    interval: Mapped[str] = mapped_column(String(10))
+    side: Mapped[str] = mapped_column(String(10))
+    quantity: Mapped[Decimal] = mapped_column(DecimalText())
+    entry_price: Mapped[Decimal] = mapped_column(DecimalText())
+    exit_price: Mapped[Decimal] = mapped_column(DecimalText())
+    stop_loss: Mapped[Decimal] = mapped_column(DecimalText())
+    take_profit: Mapped[Decimal] = mapped_column(DecimalText())
+    fees: Mapped[Decimal] = mapped_column(DecimalText())
+    gross_pnl: Mapped[Decimal] = mapped_column(DecimalText())
+    net_pnl: Mapped[Decimal] = mapped_column(DecimalText())
+    result: Mapped[str] = mapped_column(String(20), index=True)
+    opened_at: Mapped[datetime] = mapped_column(AwareDateTimeText())
+    closed_at: Mapped[datetime] = mapped_column(AwareDateTimeText())
+    strategy: Mapped[str] = mapped_column(String(100), index=True)
+    exit_reason: Mapped[str] = mapped_column(String(30))
+    entry_signal_json: Mapped[str | None] = mapped_column(Text, nullable=True)

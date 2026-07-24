@@ -5,6 +5,11 @@ from trading_bot.persistence.exceptions import (
     BacktestNotFoundError,
     PersistenceError,
 )
+from trading_bot.persistence.paper_repository import (
+    PaperSessionRepository,
+    PaperTradeCounts,
+    build_paper_session_id,
+)
 from trading_bot.persistence.records import BacktestSummary
 from trading_bot.persistence.repositories import BacktestRepository
 
@@ -13,5 +18,8 @@ __all__ = [
     "BacktestRepository",
     "BacktestSummary",
     "Database",
+    "PaperSessionRepository",
+    "PaperTradeCounts",
     "PersistenceError",
+    "build_paper_session_id",
 ]

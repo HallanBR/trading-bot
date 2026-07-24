@@ -47,8 +47,9 @@ def market_candle(
     high: str,
     low: str,
     close: str = "11",
+    index: int = 1,
 ) -> Candle:
-    open_time = datetime(2026, 1, 1, 0, 1, tzinfo=timezone.utc)
+    open_time = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=index)
     return Candle(
         symbol="BTCUSDT",
         interval="1m",
@@ -94,3 +95,28 @@ def test_paper_executor_does_not_replace_pending_signal() -> None:
     assert paper.queue_signal(buy_signal()) is True
     assert paper.queue_signal(buy_signal()) is False
     assert paper.snapshot().has_pending_signal is True
+
+
+def test_paper_executor_restores_pending_signal_exactly() -> None:
+    original = executor()
+    original.queue_signal(buy_signal())
+    state = original.export_state()
+    restored = executor()
+
+    restored.restore_state(state)
+
+    assert restored.export_state() == state
+
+
+def test_restored_open_position_keeps_trade_counter_and_can_close() -> None:
+    original = executor()
+    original.queue_signal(buy_signal())
+    assert original.process_candle(market_candle(high="11", low="9.5")) == ()
+    state = original.export_state()
+    restored = executor()
+    restored.restore_state(state)
+
+    trades = restored.process_candle(market_candle(high="12", low="9.5", index=2))
+
+    assert trades[0].trade_id == "paper-trade-1"
+    assert restored.snapshot().open_position is None

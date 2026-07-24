@@ -1,6 +1,5 @@
 """Gravação e consulta idempotentes de operações perdedoras."""
 
-import hashlib
 import json
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -13,6 +12,7 @@ from trading_bot.learning.database import LearningDatabase
 from trading_bot.learning.exceptions import LearningPersistenceError
 from trading_bot.learning.models import LosingTradeModel
 from trading_bot.learning.records import LosingTradeCase
+from trading_bot.persistence.trade_identity import closed_trade_case_id
 
 
 class LosingTradeRepository:
@@ -28,7 +28,7 @@ class LosingTradeRepository:
 
         if trade.result is not TradeResult.LOSS:
             return False
-        case_id = self._case_id(trade)
+        case_id = closed_trade_case_id(trade)
         try:
             with self.database.session() as database_session:
                 if database_session.get(LosingTradeModel, case_id) is not None:
@@ -145,23 +145,3 @@ class LosingTradeRepository:
             signal_reason=model.signal_reason,
             indicators=indicators,
         )
-
-    @staticmethod
-    def _case_id(trade: Trade) -> str:
-        """Gera um identificador estável mesmo após reiniciar o paper runner."""
-
-        parts = (
-            "losing-trade-v1",
-            trade.trade_id,
-            trade.symbol,
-            trade.interval,
-            trade.side.value,
-            trade.opened_at.astimezone(timezone.utc).isoformat(),
-            trade.closed_at.astimezone(timezone.utc).isoformat(),
-            str(trade.entry_price),
-            str(trade.exit_price),
-            str(trade.quantity),
-            str(trade.fees),
-            trade.strategy,
-        )
-        return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()

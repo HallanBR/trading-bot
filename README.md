@@ -30,6 +30,7 @@ trading-bot/
 │   ├── indicators/     # Indicadores técnicos
 │   ├── learning/       # Banco isolado de exemplos para aprendizado futuro
 │   ├── market_data/    # Provedores e validação de dados
+│   ├── monitoring/     # Atividade no terminal e no Discord
 │   ├── notifications/  # Notificações, incluindo Discord
 │   ├── persistence/    # Banco de dados e repositórios
 │   ├── risk/           # Regras de gestão de risco
@@ -159,9 +160,26 @@ Valores `Decimal` são armazenados como texto exato e datas são normalizadas em
 UTC, evitando conversões silenciosas para ponto flutuante ou timestamps sem
 fuso. Cada resultado e seus trades são salvos na mesma transação.
 
+O mesmo arquivo `data/trading_bot.db` mantém um checkpoint separado para cada
+combinação de ativo, intervalo e estratégia. Após cada candle, o estado completo
+da conta virtual e os trades recém-encerrados são atualizados atomicamente.
+Assim, saldo, posição aberta, sinal pendente, limites diários, histórico e último
+candle podem ser restaurados depois de uma reinicialização.
+
 ## Notificações no Discord
 
-O webhook é carregado exclusivamente do `.env` e mantido como segredo:
+Os webhooks são carregados exclusivamente do `.env` e mantidos como segredo:
+
+```dotenv
+# Canal que recebe somente vitórias, derrotas e empates
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+
+# Outro canal, dedicado à atividade operacional
+DISCORD_MONITORING_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+Os endereços devem pertencer a webhooks diferentes. Se o segundo não estiver
+configurado, o monitoramento continua normalmente no terminal.
 
 ```python
 from trading_bot.notifications import (
@@ -178,16 +196,26 @@ results = notifications.notify_trade(trade)
 discord.close()
 ```
 
-O serviço aceita somente objetos `Trade`, portanto sinais e posições abertas
-não geram mensagens. Falhas do Discord são retornadas como resultados seguros,
-sem interromper outros canais e sem incluir a URL do webhook nos erros.
-Backtests não enviam notificações automaticamente.
+O serviço de resultados aceita somente objetos `Trade`. Sinais e posições abertas
+são direcionados exclusivamente ao serviço de monitoramento. Falhas do Discord
+são retornadas como resultados seguros, sem interromper o terminal e sem incluir
+a URL do webhook nos erros. Backtests não enviam notificações automaticamente.
+
+O canal de monitoramento recebe lotes compactos como:
+
+```text
+20:31 | BTCUSDT 1m | Candle processado.
+20:31 | BTCUSDT 1m | Aguardando sinal.
+20:42 | BTCUSDT 1m | Sinal de COMPRA encontrado.
+20:43 | BTCUSDT 1m | Posição virtual COMPRADA aberta em 118000.
+```
 
 ## Paper trading
 
 O runner consulta candles públicos periodicamente e mantém apenas uma conta
 virtual. Na primeira consulta ele aquece o histórico sem criar operações
-retroativas; depois processa cada candle fechado uma única vez.
+retroativas; depois processa cada candle fechado uma única vez e salva o
+checkpoint.
 
 ```powershell
 python scripts/run_paper_trading.py --symbol BTCUSDT --interval 5m
@@ -199,7 +227,17 @@ Interrompa com `Ctrl+C`. O ciclo:
 2. gera o sinal no fechamento;
 3. simula a entrada na abertura do candle seguinte;
 4. monitora stop e alvo;
-5. notifica o Discord somente quando o trade virtual termina.
+5. registra toda operação encerrada no histórico paper;
+6. registra também as perdas no banco de aprendizado;
+7. notifica o canal de resultados somente quando o trade termina;
+8. envia a atividade ao terminal e ao canal separado de monitoramento.
+
+Ao executar novamente o mesmo ativo, intervalo e estratégia, a sessão anterior é
+restaurada. Para consultar o estado sem iniciar o runner:
+
+```powershell
+python scripts/show_paper_status.py --symbol BTCUSDT --interval 1m
+```
 
 O script não contém cliente autenticado da Binance, chave de corretora nem
 qualquer método de criação de ordens.
@@ -226,9 +264,9 @@ python scripts/show_losing_trades.py
 
 O arquivo fica somente no computador e é ignorado pelo Git. Esta etapa apenas
 constrói o conjunto de exemplos; ela ainda não treina modelos nem altera a
-estratégia automaticamente. Antes do aprendizado, também serão coletadas
-operações vencedoras em um conjunto de comparação, porque um modelo não pode
-aprender a diferença entre sucesso e fracasso observando somente perdas.
+estratégia automaticamente. Todas as vitórias, derrotas e empates já são
+registrados em `data/trading_bot.db`, formando o conjunto de comparação
+necessário para o aprendizado futuro.
 
 ## Escopo desta versão
 
@@ -242,8 +280,12 @@ Ainda não há:
 ## Próximas etapas
 
 - Importar e validar candles por CSV.
-- Persistir o estado da sessão paper para recuperação após reinicialização.
-- Criar o conjunto de comparação de vitórias e a validação temporal do modelo.
+- Coletar histórico extenso da Binance.
+- Implementar validação walk-forward.
+- Testar filtros de mercado e um otimizador controlado.
+- Treinar o primeiro filtro probabilístico somente após acumular dados.
+
+Consulte [ROADMAP.md](ROADMAP.md) para acompanhar as dez prioridades.
 
 ## Licença
 

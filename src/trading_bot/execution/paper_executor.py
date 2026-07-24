@@ -29,6 +29,41 @@ class PaperAccountSnapshot:
     rejected_signals: int
 
 
+@dataclass(frozen=True, slots=True)
+class PaperExecutorState:
+    """Estado completo necessário para continuar uma conta paper."""
+
+    equity: Decimal
+    pending_signal: Signal | None
+    open_position: Position | None
+    current_day: date | None
+    day_start_equity: Decimal
+    daily_net_pnl: Decimal
+    trades_today: int
+    consecutive_losses: int
+    rejected_signals: int
+    position_number: int
+
+    def __post_init__(self) -> None:
+        if self.equity <= 0 or self.day_start_equity <= 0:
+            raise ValueError("Os valores de capital do estado devem ser positivos.")
+        counters = (
+            self.trades_today,
+            self.consecutive_losses,
+            self.rejected_signals,
+            self.position_number,
+        )
+        if any(
+            isinstance(counter, bool) or not isinstance(counter, int) or counter < 0
+            for counter in counters
+        ):
+            raise ValueError("Contadores do estado devem ser inteiros não negativos.")
+        if self.pending_signal is not None and self.open_position is not None:
+            raise ValueError("O estado não pode ter sinal e posição simultaneamente.")
+        if self.open_position is not None and self.position_number == 0:
+            raise ValueError("Uma posição aberta exige um contador de posições.")
+
+
 class PaperExecutor:
     """Mantém uma conta virtual e processa um candle fechado por vez."""
 
@@ -133,6 +168,36 @@ class PaperExecutor:
             consecutive_losses=self._consecutive_losses,
             rejected_signals=self._rejected_signals,
         )
+
+    def export_state(self) -> PaperExecutorState:
+        """Exporta uma cópia imutável de todo o estado interno."""
+
+        return PaperExecutorState(
+            equity=self._equity,
+            pending_signal=self._pending_signal,
+            open_position=self._position,
+            current_day=self._current_day,
+            day_start_equity=self._day_start_equity,
+            daily_net_pnl=self._daily_net_pnl,
+            trades_today=self._trades_today,
+            consecutive_losses=self._consecutive_losses,
+            rejected_signals=self._rejected_signals,
+            position_number=self._position_number,
+        )
+
+    def restore_state(self, state: PaperExecutorState) -> None:
+        """Restaura um checkpoint validado sem modificar risco ou fills."""
+
+        self._equity = state.equity
+        self._pending_signal = state.pending_signal
+        self._position = state.open_position
+        self._current_day = state.current_day
+        self._day_start_equity = state.day_start_equity
+        self._daily_net_pnl = state.daily_net_pnl
+        self._trades_today = state.trades_today
+        self._consecutive_losses = state.consecutive_losses
+        self._rejected_signals = state.rejected_signals
+        self._position_number = state.position_number
 
     def _risk_context(self) -> RiskContext:
         return RiskContext(
