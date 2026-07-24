@@ -10,12 +10,12 @@ from trading_bot.domain import (
     Candle,
     ExitReason,
     Position,
-    PositionSide,
     Signal,
     SignalAction,
     Trade,
     TradeResult,
 )
+from trading_bot.execution import FillSimulator
 from trading_bot.risk import RiskContext, RiskManager
 from trading_bot.strategies import Strategy
 
@@ -33,6 +33,10 @@ class BacktestEngine:
         self.strategy = strategy
         self.risk_manager = risk_manager or RiskManager()
         self.config = config or BacktestConfig()
+        self._fills = FillSimulator(
+            fee_rate=self.config.fee_rate,
+            slippage_rate=self.config.slippage_rate,
+        )
 
     def run(self, candles: Sequence[Candle]) -> BacktestResult:
         """Simula sinais, entradas no candle seguinte e encerramentos."""
@@ -69,7 +73,10 @@ class BacktestEngine:
 
             if pending_signal is not None and position is None:
                 try:
-                    executable_signal = self._signal_at_open(pending_signal, candle)
+                    executable_signal = self._fills.signal_at_open(
+                        pending_signal,
+                        candle,
+                    )
                 except ValueError:
                     rejected_signals += 1
                 else:
@@ -88,25 +95,26 @@ class BacktestEngine:
                     if assessment.approved:
                         position_number += 1
                         trades_today += 1
-                        position = self._open_position(
+                        position = self._fills.open_position(
                             executable_signal,
                             assessment.quantity,
                             candle,
-                            position_number,
+                            f"position-{position_number}",
                         )
                     else:
                         rejected_signals += 1
                 pending_signal = None
 
             if position is not None:
-                exit_event = self._exit_event(position, candle)
+                exit_event = self._fills.exit_event(position, candle)
                 if exit_event is not None:
                     exit_price, exit_reason = exit_event
-                    trade = self._close_position(
+                    trade = self._fills.close_position(
                         position,
                         candle,
                         exit_price,
                         exit_reason,
+                        trade_id=position.position_id.replace("position", "trade"),
                     )
                     trades.append(trade)
                     balance += trade.net_pnl
@@ -127,11 +135,12 @@ class BacktestEngine:
 
         if position is not None:
             final_candle = candles[-1]
-            trade = self._close_position(
+            trade = self._fills.close_position(
                 position,
                 final_candle,
                 final_candle.close,
                 ExitReason.END_OF_DATA,
+                trade_id=position.position_id.replace("position", "trade"),
             )
             trades.append(trade)
             balance += trade.net_pnl
@@ -146,118 +155,6 @@ class BacktestEngine:
             equity_curve=tuple(equity_curve),
             rejected_signals=rejected_signals,
         )
-
-    def _signal_at_open(self, signal: Signal, candle: Candle) -> Signal:
-        assert signal.stop_loss is not None
-        assert signal.take_profit is not None
-        is_buy = signal.action is SignalAction.BUY
-        entry_price = self._with_slippage(candle.open, is_buy=is_buy)
-        stop_distance = abs(signal.price - signal.stop_loss)
-        target_distance = abs(signal.take_profit - signal.price)
-
-        if is_buy:
-            stop_loss = entry_price - stop_distance
-            take_profit = entry_price + target_distance
-        else:
-            stop_loss = entry_price + stop_distance
-            take_profit = entry_price - target_distance
-
-        return Signal(
-            symbol=signal.symbol,
-            interval=signal.interval,
-            action=signal.action,
-            generated_at=signal.generated_at,
-            price=entry_price,
-            strategy=signal.strategy,
-            reason=signal.reason,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            indicators=signal.indicators,
-        )
-
-    @staticmethod
-    def _open_position(
-        signal: Signal,
-        quantity: Decimal,
-        candle: Candle,
-        position_number: int,
-    ) -> Position:
-        assert signal.stop_loss is not None
-        assert signal.take_profit is not None
-        side = (
-            PositionSide.LONG
-            if signal.action is SignalAction.BUY
-            else PositionSide.SHORT
-        )
-        return Position(
-            position_id=f"position-{position_number}",
-            symbol=signal.symbol,
-            interval=signal.interval,
-            side=side,
-            quantity=quantity,
-            entry_price=signal.price,
-            stop_loss=signal.stop_loss,
-            take_profit=signal.take_profit,
-            opened_at=candle.open_time,
-            strategy=signal.strategy,
-        )
-
-    def _exit_event(
-        self,
-        position: Position,
-        candle: Candle,
-    ) -> tuple[Decimal, ExitReason] | None:
-        if position.side is PositionSide.LONG:
-            if candle.open <= position.stop_loss:
-                return candle.open, ExitReason.STOP_LOSS
-            if candle.open >= position.take_profit:
-                return candle.open, ExitReason.TAKE_PROFIT
-            if candle.low <= position.stop_loss:
-                return position.stop_loss, ExitReason.STOP_LOSS
-            if candle.high >= position.take_profit:
-                return position.take_profit, ExitReason.TAKE_PROFIT
-        else:
-            if candle.open >= position.stop_loss:
-                return candle.open, ExitReason.STOP_LOSS
-            if candle.open <= position.take_profit:
-                return candle.open, ExitReason.TAKE_PROFIT
-            if candle.high >= position.stop_loss:
-                return position.stop_loss, ExitReason.STOP_LOSS
-            if candle.low <= position.take_profit:
-                return position.take_profit, ExitReason.TAKE_PROFIT
-        return None
-
-    def _close_position(
-        self,
-        position: Position,
-        candle: Candle,
-        raw_exit_price: Decimal,
-        reason: ExitReason,
-    ) -> Trade:
-        exit_is_buy = position.side is PositionSide.SHORT
-        exit_price = self._with_slippage(raw_exit_price, is_buy=exit_is_buy)
-        entry_fee = position.entry_price * position.quantity * self.config.fee_rate
-        exit_fee = exit_price * position.quantity * self.config.fee_rate
-        return Trade(
-            trade_id=position.position_id.replace("position", "trade"),
-            symbol=position.symbol,
-            interval=position.interval,
-            side=position.side,
-            quantity=position.quantity,
-            entry_price=position.entry_price,
-            exit_price=exit_price,
-            stop_loss=position.stop_loss,
-            take_profit=position.take_profit,
-            fees=entry_fee + exit_fee,
-            opened_at=position.opened_at,
-            closed_at=candle.close_time,
-            strategy=position.strategy,
-            exit_reason=reason,
-        )
-
-    def _with_slippage(self, price: Decimal, *, is_buy: bool) -> Decimal:
-        direction = Decimal(1) if is_buy else Decimal(-1)
-        return price * (Decimal(1) + (direction * self.config.slippage_rate))
 
     @staticmethod
     def _validate_candles(candles: Sequence[Candle]) -> None:

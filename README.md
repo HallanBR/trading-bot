@@ -187,6 +187,27 @@ não geram mensagens. Falhas do Discord são retornadas como resultados seguros,
 sem interromper outros canais e sem incluir a URL do webhook nos erros.
 Backtests não enviam notificações automaticamente.
 
+## Paper trading
+
+O runner consulta candles públicos periodicamente e mantém apenas uma conta
+virtual. Na primeira consulta ele aquece o histórico sem criar operações
+retroativas; depois processa cada candle fechado uma única vez.
+
+```powershell
+python scripts/run_paper_trading.py --symbol BTCUSDT --interval 5m
+```
+
+Interrompa com `Ctrl+C`. O ciclo:
+
+1. ignora o candle ainda em formação;
+2. gera o sinal no fechamento;
+3. simula a entrada na abertura do candle seguinte;
+4. monitora stop e alvo;
+5. notifica o Discord somente quando o trade virtual termina.
+
+O script não contém cliente autenticado da Binance, chave de corretora nem
+qualquer método de criação de ordens.
+
 ## Escopo desta versão
 
 Ainda não há:
@@ -199,7 +220,7 @@ Ainda não há:
 ## Próximas etapas
 
 - Importar e validar candles por CSV.
-- Criar o ciclo de paper trading com atualização periódica de candles.
+- Persistir o estado da sessão paper para recuperação após reinicialização.
 
 ## Configuração futura
 
